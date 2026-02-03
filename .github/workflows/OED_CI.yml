@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, prod]
+  push:
+    branches: [dev, prod]
+
+jobs:
+  oed-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Docker versions
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Build Docker images
+        run: |
+          docker compose build
+
+      - name: Start services
+        run: |
+          docker compose up -d
+
+      - name: Wait for services
+        shell: bash
+        run: |
+          set -e
+          echo "Waiting briefly for containers to become ready..."
+          for i in {1..30}; do
+            docker compose ps || true
+            sleep 2
+          done
+
+      - name: Run OED CI tests
+        run: |
+          docker compose run --rm web npm run testsome src/server/test
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose down -v
